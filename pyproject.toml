@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audio-explorer"
+version = "0.1.0"
+authors = [
+  { name="Shivashant", email="hey.shiv@example.com" },
+]
+description = "A research-grade DSP and Audio AI toolkit."
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.23.0",
+    "scipy>=1.9.0",
+    "matplotlib>=3.6.0",
+    "librosa>=0.10.0",
+    "plotly>=5.10.0",
+    "streamlit>=1.20.0",
+    "jupyter>=1.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/hey-shiv/Audio-Explorer"
+"Bug Tracker" = "https://github.com/hey-shiv/Audio-Explorer/issues"
