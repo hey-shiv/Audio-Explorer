@@ -8,9 +8,10 @@ This is the entry point for the entire interactive interface.
 We build features incrementally here — Day by Day throughout the sprint.
 
 Day 1: Audio loading + metadata display
-Day 2: Waveform visualization (coming soon)
+Day 2: Waveform visualization  ✅
 Day 3: Spectrogram (coming soon)
-...
+Day 4: Mel Spectrogram (coming soon)
+Day 5: MFCC (coming soon)
 """
 
 import sys
@@ -29,6 +30,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from audio_explorer.core.loader import load_audio, AudioFile
+from audio_explorer.visualization.waveform import plot_waveform, get_waveform_stats
 
 
 # ---------------------------------------------------------------------------
@@ -153,11 +155,11 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    st.markdown("**Sprint Mode — Day 1**")
+    st.markdown("**Sprint Mode — Day 2**")
     st.markdown("""
     ✅ Audio loading  
     ✅ Metadata display  
-    ⏳ Waveform (Day 2)  
+    ✅ Waveform (Day 2)  
     ⏳ Spectrogram (Day 3)  
     ⏳ Mel Spectrogram (Day 4)  
     ⏳ MFCC (Day 5)  
@@ -316,9 +318,79 @@ else:
         st.audio(uploaded_file.getvalue(), format=f"audio/{suffix.lstrip('.')}")
 
         st.markdown("---")
+
+        # ------------------------------------------------------------------
+        # Day 2: Waveform Visualization
+        #
+        # We call plot_waveform() from our visualization module.
+        # It returns a Plotly Figure object.
+        # st.plotly_chart() renders it as an interactive chart in the browser.
+        #   - use_container_width=True makes the chart stretch to fill the
+        #     full width of the Streamlit column.
+        # ------------------------------------------------------------------
+        st.markdown("### 📈 Waveform — Time Domain")
+
         st.markdown(
-            "📌 **Next:** Waveform visualization comes in **Day 2**. "
-            "The raw signal array above will be plotted as an interactive time-domain chart."
+            "The waveform shows **amplitude (air pressure)** on the Y-axis "
+            "vs **time** on the X-axis. Each point is one decoded PCM sample "
+            "from the `y` array. You can zoom, pan, and hover over any point."
+        )
+
+        # Render the interactive waveform chart
+        waveform_fig = plot_waveform(audio)
+        st.plotly_chart(waveform_fig, use_container_width=True)
+
+        # ------------------------------------------------------------------
+        # Signal Statistics Section
+        #
+        # get_waveform_stats() returns a dict of signal health metrics.
+        # We display them in a 5-column row.
+        # ------------------------------------------------------------------
+        with st.expander("📊 Signal Statistics"):
+            stats = get_waveform_stats(audio)
+
+            s1, s2, s3, s4, s5 = st.columns(5)
+
+            s1.metric(
+                label="Peak Amplitude",
+                value=stats["peak_amplitude"],
+                help="Maximum absolute value in the signal. Should be ≤ 1.0.",
+            )
+            s2.metric(
+                label="RMS Amplitude",
+                value=stats["rms_amplitude"],
+                help="Root Mean Square — a measure of average loudness.",
+            )
+            s3.metric(
+                label="DC Offset",
+                value=stats["dc_offset"],
+                help="Mean of the signal. Ideally 0.0. Non-zero indicates a bias.",
+            )
+            s4.metric(
+                label="Dynamic Range",
+                value=f"{stats['dynamic_range_db']} dB",
+                help="Difference between peak and RMS in decibels.",
+            )
+
+            clipped_label = "⚠️ YES — Data Lost!" if stats["is_clipped"] else "✅ No Clipping"
+            s5.metric(
+                label="Clipping Detected",
+                value=clipped_label,
+                help="Clipping means samples hit ±1.0, causing permanent distortion.",
+            )
+
+            if stats["is_clipped"]:
+                st.warning(
+                    "⚠️ **Clipping detected.** One or more samples reached ±1.0. "
+                    "This means the original recording was too loud for the microphone, "
+                    "causing permanent information loss. This audio may sound distorted."
+                )
+
+        st.markdown("---")
+        st.markdown(
+            "📌 **Next:** Spectrogram comes in **Day 3**. "
+            "We will convert this 1D waveform into a 2D time-frequency image — "
+            "the same representation used as input by Whisper and AudioMAE."
         )
 
     except Exception as e:
