@@ -9,7 +9,7 @@ We build features incrementally here — Day by Day throughout the sprint.
 
 Day 1: Audio loading + metadata display
 Day 2: Waveform visualization  ✅
-Day 3: Spectrogram (coming soon)
+Day 3: Spectrogram  ✅
 Day 4: Mel Spectrogram (coming soon)
 Day 5: MFCC (coming soon)
 """
@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from audio_explorer.core.loader import load_audio, AudioFile
 from audio_explorer.visualization.waveform import plot_waveform, get_waveform_stats
+from audio_explorer.visualization.spectrogram import compute_spectrogram, plot_spectrogram
 
 
 # ---------------------------------------------------------------------------
@@ -155,12 +156,12 @@ with st.sidebar:
     )
 
     st.markdown("---")
-    st.markdown("**Sprint Mode — Day 2**")
+    st.markdown("**Sprint Mode — Day 3**")
     st.markdown("""
     ✅ Audio loading  
     ✅ Metadata display  
-    ✅ Waveform (Day 2)  
-    ⏳ Spectrogram (Day 3)  
+    ✅ Waveform  
+    ✅ Spectrogram  
     ⏳ Mel Spectrogram (Day 4)  
     ⏳ MFCC (Day 5)  
     ⏳ Beat Tracking (Day 6)  
@@ -387,10 +388,97 @@ else:
                 )
 
         st.markdown("---")
+
+        # ==================================================================
+        # Day 3: Spectrogram — Frequency vs Time
+        #
+        # This is the most important visualization in all of audio AI.
+        # We convert the 1D waveform into a 2D heatmap showing which
+        # frequencies are active at every moment in the audio.
+        #
+        # PIPELINE:
+        #   y (1D) → STFT → |magnitude| → dB → Plotly Heatmap
+        # ==================================================================
+        st.markdown("### 🎨 Spectrogram — Frequency vs Time")
+
         st.markdown(
-            "📌 **Next:** Spectrogram comes in **Day 3**. "
-            "We will convert this 1D waveform into a 2D time-frequency image — "
-            "the same representation used as input by Whisper and AudioMAE."
+            "The spectrogram shows **frequency (Hz)** on the Y-axis vs "
+            "**time (seconds)** on the X-axis. Brighter colors = more energy. "
+            "This is the exact 2D representation that Whisper, AudioMAE, "
+            "and CLAP use as input."
+        )
+
+        # Compute the spectrogram using our module
+        spec_data = compute_spectrogram(audio, n_fft=2048, hop_length=512)
+
+        # Render the interactive heatmap
+        spec_fig = plot_spectrogram(spec_data)
+        st.plotly_chart(spec_fig, use_container_width=True)
+
+        # ------------------------------------------------------------------
+        # STFT Technical Details Expander
+        #
+        # This section exposes the STFT parameters and computed metadata
+        # so the user understands what happened mathematically.
+        # ------------------------------------------------------------------
+        with st.expander("🔬 STFT Parameters & Technical Details"):
+
+            p1, p2, p3, p4 = st.columns(4)
+
+            p1.metric(
+                label="FFT Size (n_fft)",
+                value=f"{spec_data['n_fft']:,}",
+                help=(
+                    "Number of samples per analysis window. "
+                    "Controls frequency resolution: more samples = "
+                    "finer frequency detail, but coarser time detail."
+                ),
+            )
+            p2.metric(
+                label="Hop Length",
+                value=f"{spec_data['hop_length']:,}",
+                help=(
+                    "How far the window slides between frames. "
+                    "Smaller hop = more overlap = smoother time resolution."
+                ),
+            )
+            p3.metric(
+                label="Freq Resolution",
+                value=f"{spec_data['freq_resolution']} Hz/bin",
+                help="Each row of the spectrogram spans this many Hz.",
+            )
+            p4.metric(
+                label="Time Resolution",
+                value=f"{spec_data['time_resolution']} sec/frame",
+                help="Each column of the spectrogram spans this many seconds.",
+            )
+
+            st.markdown("---")
+
+            st.markdown(
+                f"**Spectrogram shape:** `{spec_data['S_db'].shape}` — "
+                f"`{spec_data['S_db'].shape[0]}` frequency bins × "
+                f"`{spec_data['S_db'].shape[1]}` time frames"
+            )
+            st.markdown(
+                f"**Frequency range:** 0 Hz → {spec_data['freqs'][-1]:,.0f} Hz "
+                f"(Nyquist limit = sample rate / 2 = {audio.sr} / 2)"
+            )
+            st.markdown(
+                f"**dB range:** {spec_data['S_db'].min():.1f} dB (quietest) → "
+                f"{spec_data['S_db'].max():.1f} dB (loudest)"
+            )
+            st.markdown(
+                "*Each cell in the matrix tells you how much energy (in dB) "
+                "exists at that specific frequency and time. This 2D matrix "
+                "is the primary input format for modern audio neural networks.*"
+            )
+
+        st.markdown("---")
+        st.markdown(
+            "📌 **Next:** Mel Spectrogram comes in **Day 4**. "
+            "We will warp the frequency axis to match human hearing perception — "
+            "the Mel Scale — making the spectrogram even more useful for AI."
         )
 
     except Exception as e:
