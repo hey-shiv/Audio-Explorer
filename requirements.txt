@@ -1,7 +1,8 @@
-numpy>=1.23.0
-scipy>=1.9.0
-matplotlib>=3.6.0
-librosa>=0.10.0
-plotly>=5.10.0
-streamlit>=1.20.0
-jupyter>=1.0.0
+numpy>=2.0
+scipy>=1.13
+matplotlib>=3.9
+plotly>=6.0
+librosa>=0.11
+soundfile>=0.14
+streamlit>=1.60
+audioread>=3.0
