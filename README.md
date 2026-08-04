@@ -1,161 +1,126 @@
-# 🎵 Audio Explorer
+# Audio Explorer
 
-**A research-grade, interactive audio analysis toolkit built from first principles.**
+An interactive toolkit that implements the complete audio preprocessing pipeline used by Whisper, CLAP, AudioMAE, and every major audio AI system — from raw PCM samples to MFCCs and beat detection.
 
-Audio Explorer is a comprehensive audio analysis platform that transforms raw audio files into rich, interactive visualizations. Built as part of a 20-module AI + Music research curriculum, it serves as both a learning tool and a professional portfolio project.
+Drop any audio file. Get waveform analysis, spectrograms, mel spectrograms, cepstral coefficients, and tempo estimation. Everything runs locally in the browser.
 
-[![Python 3.10](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/downloads/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.60-red.svg)](https://streamlit.io/)
-[![Librosa](https://img.shields.io/badge/Librosa-0.11-green.svg)](https://librosa.org/)
-
----
-
-## ✨ Features
-
-| Feature | Description |
-|---------|-------------|
-| 📂 **Audio Loading** | Load WAV, MP3, FLAC with full metadata extraction (sample rate, duration, channels, bit depth) |
-| 📈 **Waveform** | Interactive time-domain visualization with signal statistics (RMS, peak, DC offset, clipping detection) |
-| 🎨 **Spectrogram** | STFT-based frequency vs time heatmap with configurable FFT parameters |
-| 🧠 **Mel Spectrogram** | Perceptually-warped frequency representation — the standard input for Whisper, CLAP, and AudioMAE |
-| 🎯 **MFCCs** | Mel-Frequency Cepstral Coefficients with Delta MFCCs for spectral envelope analysis |
-| 🥁 **Beat Tracking** | Automatic tempo (BPM) estimation, beat detection overlay, and beat interval consistency analysis |
-
----
-
-## 🚀 Quick Start
-
-### 1. Clone the Repository
-
-```bash
+```
 git clone https://github.com/hey-shiv/Audio-Explorer.git
 cd Audio-Explorer
-```
-
-### 2. Create Environment
-
-```bash
-conda create -n audio_explorer python=3.10 -y
-conda activate audio_explorer
-```
-
-### 3. Install Dependencies
-
-```bash
 pip install -r requirements.txt
-```
-
-### 4. Run the App
-
-```bash
 streamlit run app.py
 ```
 
-The app will open at `http://localhost:8501`. Upload any WAV, MP3, or FLAC file to begin analysis.
-
 ---
 
-## 📁 Project Structure
+## What this does
+
+Audio Explorer processes audio through six analysis stages, each building on the last:
 
 ```
-Audio-Explorer/
-├── app.py                              # Streamlit application (entry point)
-├── src/
-│   └── audio_explorer/
-│       ├── __init__.py
-│       ├── core/
-│       │   ├── __init__.py
-│       │   └── loader.py               # Audio file loading & metadata extraction
-│       └── visualization/
-│           ├── __init__.py
-│           ├── waveform.py             # Time-domain waveform + signal stats
-│           ├── spectrogram.py          # STFT-based spectrogram
-│           ├── mel_spectrogram.py      # Mel-warped spectrogram
-│           ├── mfcc.py                 # MFCC & Delta MFCC computation
-│           └── rhythm.py              # Tempo estimation & beat tracking
-├── data/                               # Sample audio files (not committed)
-├── notebooks/                          # Jupyter notebooks for exploration
-├── notes/                              # Course chapter notes
-├── docs/                               # Project documentation
-├── tests/                              # Unit tests
-├── requirements.txt
-├── pyproject.toml
-└── LICENSE
+                          ┌─────────────────────────────────────────────┐
+                          │           THE AUDIO AI PIPELINE             │
+                          └─────────────────────────────────────────────┘
+
+  MP3 / WAV / FLAC
+       │
+       ├── librosa.load() ──────────── 1D float array (amplitude vs time)
+       │                                     │
+       ├── STFT ────────────────────── 2D matrix (1025 freq bins × time)
+       │                                     │
+       ├── Mel filterbank ──────────── 2D matrix (128 mel bands × time)
+       │                                     │
+       ├── DCT ─────────────────────── 2D matrix (13 coefficients × time)
+       │
+       └── onset detection ─────────── tempo (BPM) + beat positions
+```
+
+**Stage 1 — Waveform.** Decode compressed audio into a float32 array. Compute signal statistics: RMS, peak amplitude, DC offset, clipping detection, dynamic range.
+
+**Stage 2 — Spectrogram.** Apply the Short-Time Fourier Transform. Slide a 2048-sample Hann window across the signal with a 512-sample hop, compute the FFT on each chunk, stack the magnitude spectra into a time-frequency matrix. Convert to decibels.
+
+**Stage 3 — Mel spectrogram.** Warp the linear frequency axis to match human hearing using 128 triangular Mel filters. This is the exact input format used by Whisper (80 bands), AudioMAE (128), CLAP (64), and BEATs.
+
+**Stage 4 — MFCCs.** Apply a Discrete Cosine Transform to the log-mel spectrogram and keep the first 13 coefficients. These capture the spectral envelope — the shape of the vocal tract — and have been the standard feature for speech recognition since 1980. Delta MFCCs capture the rate of spectral change.
+
+**Stage 5 — Beat tracking.** Compute an onset strength envelope, estimate tempo via autocorrelation, and track individual beat positions using dynamic programming. Overlay beats on the waveform. Analyze beat interval consistency.
+
+Every chart is interactive — zoom, pan, hover to inspect individual samples and frequency bins.
+
+---
+
+## How the code is organized
+
+```
+app.py                                     Streamlit entry point
+src/audio_explorer/
+    core/
+        loader.py                          audio decoding + metadata
+    visualization/
+        waveform.py                        time-domain + signal stats
+        spectrogram.py                     STFT computation + rendering
+        mel_spectrogram.py                 mel filterbank + rendering
+        mfcc.py                            cepstral coefficients + deltas
+        rhythm.py                          tempo + beat detection
+generate_animation.py                      15s pipeline animation script
+```
+
+Each module follows the same pattern: a `compute_*` function that returns a dict of arrays, and a `plot_*` function that returns a Plotly figure. Computation and rendering are fully separated.
+
+---
+
+## The math
+
+The pipeline is built on four ideas spanning two centuries:
+
+**Fourier Transform (1807).** Any signal decomposes into a sum of sine waves. The DFT finds the amplitude of each frequency component:
+
+```
+X[k] = Σ x[n] · e^(-j·2π·k·n/N)     for k = 0, 1, ..., N-1
+```
+
+**Fast Fourier Transform (1965).** Cooley-Tukey algorithm computes the DFT in O(N log N) instead of O(N²). For a 3-minute song at 22,050 Hz: ~200,000x speedup.
+
+**Mel Scale (1937).** Human hearing is logarithmic. The jump from 200 Hz to 400 Hz sounds like an octave. The jump from 8,000 Hz to 8,200 Hz is barely noticeable. The Mel scale warps frequency to match:
+
+```
+m = 2595 · log₁₀(1 + f/700)
+```
+
+**MFCCs (1980).** Apply a DCT to the log-mel spectrum. The first 13 coefficients capture the smooth spectral envelope while discarding fine pitch detail. Coefficient 0 is overall energy, 1-12 encode vocal tract shape.
+
+---
+
+## Who uses this pipeline
+
+| System     | Input representation       |
+|------------|---------------------------|
+| Whisper    | 80-band mel spectrogram   |
+| AudioMAE   | 128-band mel spectrogram  |
+| CLAP       | 64-band mel spectrogram   |
+| BEATs      | mel spectrogram           |
+| MusicGen   | encoded spectrogram       |
+
+The preprocessing is the same across all of them. The model architectures differ. Audio Explorer implements the shared foundation.
+
+---
+
+## Requirements
+
+Python 3.10+, librosa, numpy, scipy, plotly, streamlit, soundfile. Full list in `requirements.txt`.
+
+```
+conda create -n audio_explorer python=3.10 -y
+conda activate audio_explorer
+pip install -r requirements.txt
 ```
 
 ---
 
-## 🧠 The Audio AI Pipeline
+## Context
 
-Audio Explorer implements the exact preprocessing pipeline used by state-of-the-art audio AI systems:
-
-```
-                                        Audio Explorer Pipeline
-                                        ═══════════════════════
-
-Raw Audio File (MP3/WAV)
-        │
-        ▼
-   librosa.load()  ──────────────────▶  Waveform (1D float array)
-        │                                    │
-        ▼                                    ▼
-   STFT (FFT per window)  ──────────▶  Spectrogram (2D: freq × time)
-        │                                    │
-        ▼                                    ▼
-   Mel Filterbank  ─────────────────▶  Mel Spectrogram (128 bands × time)
-        │                                    │
-        ▼                                    ▼
-   DCT (Cosine Transform)  ─────────▶  MFCCs (13 coefficients × time)
-
-   Beat Tracking  ──────────────────▶  Tempo (BPM) + Beat Times
-```
-
-**Real-world usage of these representations:**
-
-| System | Organization | Input Format |
-|--------|-------------|--------------|
-| Whisper | OpenAI | 80-bin Mel Spectrogram |
-| AudioMAE | Meta AI | 128-bin Mel Spectrogram |
-| CLAP | LAION | 64-bin Mel Spectrogram |
-| BEATs | Microsoft | Mel Spectrogram |
-| MusicGen | Meta AI | Encoded Spectrogram |
+This is the first deliverable of a longer curriculum on audio and music AI. The preprocessing pipeline built here is the input stage for everything that comes next — classification, representation learning, and generative models.
 
 ---
 
-## 🛠️ Tech Stack
-
-- **Python 3.10** — Core language
-- **Librosa 0.11** — Audio analysis (STFT, Mel, MFCC, beat tracking)
-- **NumPy** — Numerical computing
-- **SciPy** — Signal processing
-- **Plotly** — Interactive visualizations
-- **Streamlit** — Web application framework
-- **SoundFile** — Audio file I/O
-
----
-
-## 📚 Part of a Larger Curriculum
-
-This project is the practical component of a 20-module, 75-chapter curriculum on **AI + Music**, covering:
-
-1. **Foundations** (Modules 1–5): Physics of sound, human hearing, digital audio, DSP, mathematics
-2. **Music & Features** (Modules 6–8): Music theory, MIR, feature engineering
-3. **Engineering** (Modules 9–10): Software architecture, data pipelines
-4. **Machine Learning** (Modules 11–14): CNNs/RNNs for audio, representation learning, CLAP
-5. **Generative AI** (Modules 15–18): Audio Transformers, AudioLM, MusicGen, Diffusion
-6. **Research** (Modules 19–20): Paper reproduction, research methodology
-
----
-
-## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-## 👤 Author
-
-**Shivashant** — B.Tech CS (AI & ML)  
-Building towards AI + Music research at organizations like Google DeepMind and Suno AI.
-
-- GitHub: [@hey-shiv](https://github.com/hey-shiv)
+MIT License. Built by [Shivashant](https://github.com/hey-shiv).
